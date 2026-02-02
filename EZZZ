@@ -1,0 +1,174 @@
+-- JHUB V2
+-- ALL-IN-ONE LOCALSCRIPT
+
+-- SERVICES
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+-- PLAYER
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local root = character:WaitForChild("HumanoidRootPart")
+
+-- SETTINGS
+local undergroundDepth = 10
+local normalSpeed = 16
+local fastSpeed = 30
+local speedOn = false
+local savedSpawnCFrame = nil
+
+-- PUT PLAYER UNDERGROUND
+root.CFrame = root.CFrame * CFrame.new(0, -undergroundDepth, 0)
+
+-- NOCLIP
+RunService.Stepped:Connect(function()
+	for _, part in pairs(character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CanCollide = false
+		end
+	end
+end)
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "JHUB_V2"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- UTILITY FUNCTION: Make button draggable
+local function makeDraggable(button)
+	local dragging = false
+	local dragStart
+	local startPos
+
+	button.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = button.Position
+		end
+	end)
+
+	button.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+		or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart
+			button.Position = UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset + delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset + delta.Y
+			)
+		end
+	end)
+end
+
+-- CREATE TOGGLE SPEED BUTTON
+local speedButton = Instance.new("TextButton")
+speedButton.Size = UDim2.new(0, 180, 0, 50)
+speedButton.Position = UDim2.new(0, -200, 0, 100) -- start offscreen
+speedButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+speedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedButton.TextScaled = true
+speedButton.Font = Enum.Font.GothamBold
+speedButton.Text = "Speed: OFF (16)"
+speedButton.Parent = gui
+makeDraggable(speedButton)
+
+-- SLIDE-IN ANIMATION
+TweenService:Create(
+	speedButton,
+	TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	{Position = UDim2.new(0, 20, 0, 100)}
+):Play()
+
+-- BUTTON PRESS ANIMATION
+local function buttonPressAnim(btn)
+	local origSize = btn.Size
+	btn.MouseButton1Down:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.1), {Size = origSize - UDim2.new(0, 10, 0, 6)}):Play()
+	end)
+	btn.MouseButton1Up:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.1), {Size = origSize}):Play()
+	end)
+end
+buttonPressAnim(speedButton)
+
+-- SPEED TOGGLE LOGIC
+speedButton.MouseButton1Click:Connect(function()
+	speedOn = not speedOn
+	if speedOn then
+		humanoid.WalkSpeed = fastSpeed
+		speedButton.Text = "Speed: ON (30)"
+	else
+		humanoid.WalkSpeed = normalSpeed
+		speedButton.Text = "Speed: OFF (16)"
+	end
+end)
+
+-- CREATE SET SPAWN BUTTON
+local spawnButton = Instance.new("TextButton")
+spawnButton.Size = UDim2.new(0, 180, 0, 50)
+spawnButton.Position = UDim2.new(0, -200, 0, 160)
+spawnButton.BackgroundColor3 = Color3.fromRGB(30, 90, 30)
+spawnButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+spawnButton.Font = Enum.Font.GothamBold
+spawnButton.TextScaled = true
+spawnButton.Text = "Set Spawn"
+spawnButton.Parent = gui
+makeDraggable(spawnButton)
+TweenService:Create(
+	spawnButton,
+	TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	{Position = UDim2.new(0, 20, 0, 160)}
+):Play()
+buttonPressAnim(spawnButton)
+
+-- SAVE SPAWN LOGIC
+spawnButton.MouseButton1Click:Connect(function()
+	if character and root then
+		savedSpawnCFrame = root.CFrame
+		spawnButton.Text = "Spawn Saved ✅"
+		task.delay(1.2, function()
+			spawnButton.Text = "Set Spawn"
+		end)
+	end
+end)
+
+-- HANDLE RESPAWN
+player.CharacterAdded:Connect(function(char)
+	character = char
+	humanoid = char:WaitForChild("Humanoid")
+	root = char:WaitForChild("HumanoidRootPart")
+
+	humanoid.WalkSpeed = speedOn and fastSpeed or normalSpeed
+
+	-- Put underground
+	root.CFrame = root.CFrame * CFrame.new(0, -undergroundDepth, 0)
+
+	-- Noclip
+	RunService.Stepped:Connect(function()
+		for _, part in pairs(character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end)
+
+	-- Teleport to saved spawn if exists
+	if savedSpawnCFrame then
+		task.wait(0.1)
+		root.CFrame = savedSpawnCFrame
+	end
+end
