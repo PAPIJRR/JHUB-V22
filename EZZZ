@@ -1,5 +1,4 @@
--- JHUB V2
--- ALL-IN-ONE LOCALSCRIPT
+-- JHUB V2 - Premium Gold Version
 
 -- SERVICES
 local Players = game:GetService("Players")
@@ -9,28 +8,49 @@ local UserInputService = game:GetService("UserInputService")
 
 -- PLAYER
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local root = character:WaitForChild("HumanoidRootPart")
-
--- SETTINGS
+local savedSpawnCFrame = nil
 local undergroundDepth = 10
 local normalSpeed = 16
 local fastSpeed = 30
 local speedOn = false
-local savedSpawnCFrame = nil
 
--- PUT PLAYER UNDERGROUND
-root.CFrame = root.CFrame * CFrame.new(0, -undergroundDepth, 0)
+-- CHARACTER SETUP FUNCTION
+local function setupCharacter(char)
+	local humanoid = char:WaitForChild("Humanoid")
+	local root = char:WaitForChild("HumanoidRootPart")
 
--- NOCLIP
-RunService.Stepped:Connect(function()
-	for _, part in pairs(character:GetDescendants()) do
-		if part:IsA("BasePart") then
-			part.CanCollide = false
+	-- Put underground
+	root.CFrame = root.CFrame * CFrame.new(0, -undergroundDepth, 0)
+
+	-- WalkSpeed
+	humanoid.WalkSpeed = speedOn and fastSpeed or normalSpeed
+
+	-- Noclip
+	local noclipConn
+	noclipConn = RunService.Stepped:Connect(function()
+		if char.Parent then
+			for _, part in pairs(char:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = false
+				end
+			end
+		else
+			if noclipConn then noclipConn:Disconnect() end
 		end
+	end)
+
+	-- Teleport to saved spawn if exists
+	if savedSpawnCFrame then
+		task.wait(0.1)
+		root.CFrame = savedSpawnCFrame
 	end
-end)
+end
+
+-- INITIAL SETUP
+if player.Character then
+	setupCharacter(player.Character)
+end
+player.CharacterAdded:Connect(setupCharacter)
 
 -- GUI
 local gui = Instance.new("ScreenGui")
@@ -38,15 +58,12 @@ gui.Name = "JHUB_V2"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
--- UTILITY FUNCTION: Make button draggable
+-- DRAGGABLE FUNCTION
 local function makeDraggable(button)
-	local dragging = false
-	local dragStart
-	local startPos
+	local dragging, dragStart, startPos = false, nil, nil
 
 	button.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
 			dragStart = input.Position
 			startPos = button.Position
@@ -54,15 +71,13 @@ local function makeDraggable(button)
 	end)
 
 	button.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = false
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-		or input.UserInputType == Enum.UserInputType.Touch) then
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 			local delta = input.Position - dragStart
 			button.Position = UDim2.new(
 				startPos.X.Scale,
@@ -74,26 +89,7 @@ local function makeDraggable(button)
 	end)
 end
 
--- CREATE TOGGLE SPEED BUTTON
-local speedButton = Instance.new("TextButton")
-speedButton.Size = UDim2.new(0, 180, 0, 50)
-speedButton.Position = UDim2.new(0, -200, 0, 100) -- start offscreen
-speedButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-speedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedButton.TextScaled = true
-speedButton.Font = Enum.Font.GothamBold
-speedButton.Text = "Speed: OFF (16)"
-speedButton.Parent = gui
-makeDraggable(speedButton)
-
--- SLIDE-IN ANIMATION
-TweenService:Create(
-	speedButton,
-	TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-	{Position = UDim2.new(0, 20, 0, 100)}
-):Play()
-
--- BUTTON PRESS ANIMATION
+-- BUTTON CLICK ANIMATION
 local function buttonPressAnim(btn)
 	local origSize = btn.Size
 	btn.MouseButton1Down:Connect(function()
@@ -103,41 +99,62 @@ local function buttonPressAnim(btn)
 		TweenService:Create(btn, TweenInfo.new(0.1), {Size = origSize}):Play()
 	end)
 end
-buttonPressAnim(speedButton)
 
--- SPEED TOGGLE LOGIC
+-- SPEED BUTTON
+local speedButton = Instance.new("TextButton")
+speedButton.Size = UDim2.new(0, 180, 0, 50)
+speedButton.Position = UDim2.new(0, -200, 0, 100)
+speedButton.BackgroundColor3 = Color3.fromRGB(212, 175, 55) -- Gold
+speedButton.TextColor3 = Color3.fromRGB(30, 30, 30)
+speedButton.TextScaled = true
+speedButton.Font = Enum.Font.GothamBold
+speedButton.Text = "Speed: OFF (16)"
+speedButton.Parent = gui
+makeDraggable(speedButton)
+buttonPressAnim(speedButton)
+TweenService:Create(speedButton, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	{Position = UDim2.new(0, 20, 0, 100)}):Play()
+
+-- GOLD GLOW
+local glow1 = Instance.new("UIStroke")
+glow1.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+glow1.Color = Color3.fromRGB(255, 215, 0)
+glow1.Thickness = 2
+glow1.Parent = speedButton
+
 speedButton.MouseButton1Click:Connect(function()
 	speedOn = not speedOn
-	if speedOn then
-		humanoid.WalkSpeed = fastSpeed
-		speedButton.Text = "Speed: ON (30)"
-	else
-		humanoid.WalkSpeed = normalSpeed
-		speedButton.Text = "Speed: OFF (16)"
+	if player.Character then
+		player.Character:WaitForChild("Humanoid").WalkSpeed = speedOn and fastSpeed or normalSpeed
 	end
+	speedButton.Text = speedOn and "Speed: ON (30)" or "Speed: OFF (16)"
 end)
 
--- CREATE SET SPAWN BUTTON
+-- SPAWN BUTTON
 local spawnButton = Instance.new("TextButton")
 spawnButton.Size = UDim2.new(0, 180, 0, 50)
 spawnButton.Position = UDim2.new(0, -200, 0, 160)
-spawnButton.BackgroundColor3 = Color3.fromRGB(30, 90, 30)
-spawnButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+spawnButton.BackgroundColor3 = Color3.fromRGB(212, 175, 55) -- Gold
+spawnButton.TextColor3 = Color3.fromRGB(30, 30, 30)
 spawnButton.Font = Enum.Font.GothamBold
 spawnButton.TextScaled = true
 spawnButton.Text = "Set Spawn"
 spawnButton.Parent = gui
 makeDraggable(spawnButton)
-TweenService:Create(
-	spawnButton,
-	TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-	{Position = UDim2.new(0, 20, 0, 160)}
-):Play()
 buttonPressAnim(spawnButton)
+TweenService:Create(spawnButton, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	{Position = UDim2.new(0, 20, 0, 160)}):Play()
 
--- SAVE SPAWN LOGIC
+-- GOLD GLOW
+local glow2 = Instance.new("UIStroke")
+glow2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+glow2.Color = Color3.fromRGB(255, 215, 0)
+glow2.Thickness = 2
+glow2.Parent = spawnButton
+
 spawnButton.MouseButton1Click:Connect(function()
-	if character and root then
+	if player.Character then
+		local root = player.Character:WaitForChild("HumanoidRootPart")
 		savedSpawnCFrame = root.CFrame
 		spawnButton.Text = "Spawn Saved ✅"
 		task.delay(1.2, function()
@@ -145,30 +162,3 @@ spawnButton.MouseButton1Click:Connect(function()
 		end)
 	end
 end)
-
--- HANDLE RESPAWN
-player.CharacterAdded:Connect(function(char)
-	character = char
-	humanoid = char:WaitForChild("Humanoid")
-	root = char:WaitForChild("HumanoidRootPart")
-
-	humanoid.WalkSpeed = speedOn and fastSpeed or normalSpeed
-
-	-- Put underground
-	root.CFrame = root.CFrame * CFrame.new(0, -undergroundDepth, 0)
-
-	-- Noclip
-	RunService.Stepped:Connect(function()
-		for _, part in pairs(character:GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.CanCollide = false
-			end
-		end
-	end)
-
-	-- Teleport to saved spawn if exists
-	if savedSpawnCFrame then
-		task.wait(0.1)
-		root.CFrame = savedSpawnCFrame
-	end
-end
